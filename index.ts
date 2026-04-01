@@ -89,11 +89,16 @@ export type {
   RawSender,
   FeishuMessageContext,
   FeishuReactionCreatedEvent,
+  FeishuMessageEvent,
 } from './src/messaging/types';
 export { handleFeishuReaction } from './src/messaging/inbound/reaction-handler';
 export { parseMessageEvent } from './src/messaging/inbound/parse';
 export { checkMessageGate } from './src/messaging/inbound/gate';
 export { isMessageExpired } from './src/messaging/inbound/dedup';
+export { maybeRelayBotMentionsAfterSend } from './src/messaging/bot-relay/outbound-hook';
+export { registerBotForRelay, relayAfterSend } from './src/messaging/bot-relay/relay-api';
+export { clearRelayRuntimeState } from './src/messaging/bot-relay/runtime';
+export type { RelayKnownBot } from './src/messaging/bot-relay/types';
 
 // ---------------------------------------------------------------------------
 // Plugin definition

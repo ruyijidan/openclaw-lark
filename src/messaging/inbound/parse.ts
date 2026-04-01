@@ -22,6 +22,8 @@ import { larkLogger } from '../../core/lark-logger';
 import { isMentionAll } from './mention';
 import { getUserNameCache } from './user-name-cache';
 import { createFetchSubMessages, createParseResolveNames, fetchCardContent } from './parse-io';
+import { getKnownRelayBots } from '../bot-relay/runtime';
+import { inferMentionsFromText } from '../bot-relay/mention-inference';
 
 const log = larkLogger('inbound/parse');
 
@@ -75,6 +77,30 @@ export async function parseMessageEvent(
     };
     mentionMap.set(m.key, info);
     mentionList.push(info);
+  }
+
+  // 1b. Bot->Bot mention fallback:
+  // Feishu sometimes omits `message.mentions` for sender_type=app (bots/apps),
+  // especially for "post" messages. When that happens, infer mentions from the
+  // raw message content using the relay-known bot registry so group mention
+  // gating still works.
+  if (botOpenId && !mentionList.some((m) => m.isBot)) {
+    const knownBots = getKnownRelayBots();
+    const self = knownBots.get(botOpenId);
+    if (self?.botName) {
+      const inferred = inferMentionsFromText(event.message.content, knownBots);
+      for (const m of inferred) {
+        if (mentionMap.has(m.key)) continue;
+        const info: MentionInfo = {
+          key: m.key,
+          openId: m.openId,
+          name: m.name,
+          isBot: m.openId === botOpenId,
+        };
+        mentionMap.set(m.key, info);
+        mentionList.push(info);
+      }
+    }
   }
 
   // Build reverse map for O(1) openId lookup

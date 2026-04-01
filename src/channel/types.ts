@@ -5,8 +5,7 @@
  * Channel type definitions for the Lark/Feishu channel plugin.
  */
 
-import type { ClawdbotConfig, RuntimeEnv } from 'openclaw/plugin-sdk';
-import type { HistoryEntry } from 'openclaw/plugin-sdk/reply-history';
+import type { ClawdbotConfig, RuntimeEnv, HistoryEntry } from 'openclaw/plugin-sdk';
 import type { LarkClient } from '../core/lark-client';
 import type { MessageDedup } from '../messaging/inbound/dedup';
 
@@ -50,6 +49,7 @@ export interface MonitorContext {
   accountId: string;
   chatHistories: Map<string, HistoryEntry[]>;
   messageDedup: MessageDedup;
+  knownRelayBots?: Map<string, { accountId: string; botOpenId?: string; botName?: string }>;
   runtime?: RuntimeEnv;
   log: (...args: unknown[]) => void;
   error: (...args: unknown[]) => void;

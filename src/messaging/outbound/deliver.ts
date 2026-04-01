@@ -16,6 +16,10 @@ import { normalizeFeishuTarget, resolveReceiveIdType } from '../../core/targets'
 import { optimizeMarkdownStyle } from '../../card/markdown-style';
 import { formatLarkError } from '../../core/api-error';
 import { larkLogger } from '../../core/lark-logger';
+import { maybeRelayBotMentionsAfterSend } from '../bot-relay/outbound-hook';
+import { getKnownRelayBots, getRelayContext } from '../bot-relay/runtime';
+import { injectSyntheticRelayEvent } from '../bot-relay/injector';
+import { isRelayContext } from '../bot-relay/relay-async-context';
 import { uploadAndSendMediaLark } from './media';
 
 const log = larkLogger('outbound/deliver');
@@ -43,21 +47,37 @@ function buildPostContent(text: string): string {
  *   `<at user_id="all"></at>`           — mention everyone
  *
  * Common AI mistakes this function fixes:
- *   `<at id=all></at>`           → `<at user_id="all"></at>`
- *   `<at id="ou_xxx"></at>`      → `<at user_id="ou_xxx"></at>`
- *   `<at open_id="ou_xxx"></at>` → `<at user_id="ou_xxx"></at>`
- *   `<at user_id=ou_xxx></at>`   → `<at user_id="ou_xxx"></at>`
+ *   `<at id=all></at>`              → `<at user_id="all"></at>`
+ *   `<at id="ou_xxx"></at>`         → `<at user_id="ou_xxx"></at>`
+ *   `<at open_id="ou_xxx"></at>`    → `<at user_id="ou_xxx"></at>`
+ *   `<at user_id=ou_xxx></at>`      → `<at user_id="ou_xxx"></at>`
+ *   `<at user_id="">BotName</at>`   → `<at user_id="ou_xxx">BotName</at>` (resolved by name)
  */
-function normalizeAtMentions(text: string): string {
-  return text.replace(/<at\s+(?:id|open_id|user_id)\s*=\s*"?([^">\s]+)"?\s*>/gi, '<at user_id="$1">');
+function normalizeAtMentions(text: string, knownBots?: Map<string, { botOpenId?: string; botName?: string }>): string {
+  let result = text.replace(/<at\s+(?:id|open_id|user_id)\s*=\s*"?([^">\s]+)"?\s*>/gi, '<at user_id="$1">');
+
+  // Resolve empty user_id by bot name: <at user_id="">BotName</at>
+  if (knownBots && knownBots.size > 0) {
+    result = result.replace(/<at\s+user_id=""\s*>([^<]*)<\/at>/gi, (_match, name: string) => {
+      const trimmed = name.trim();
+      for (const bot of knownBots.values()) {
+        if (bot.botName && bot.botOpenId && bot.botName === trimmed) {
+          return `<at user_id="${bot.botOpenId}">${trimmed}</at>`;
+        }
+      }
+      return _match;
+    });
+  }
+
+  return result;
 }
 
 /**
  * Pre-process text for Lark rendering:
  * mention normalisation + table conversion + style optimization.
  */
-function prepareTextForLark(cfg: ClawdbotConfig, text: string, accountId?: string): string {
-  let processed = normalizeAtMentions(text);
+function prepareTextForLark(cfg: ClawdbotConfig, text: string, accountId?: string, knownBots?: Map<string, { botOpenId?: string; botName?: string }>): string {
+  let processed = normalizeAtMentions(text, knownBots);
 
   // Convert markdown tables to Feishu-compatible format using per-account
   // tableMode setting.
@@ -87,11 +107,14 @@ async function sendImMessage(params: {
   client: ReturnType<typeof LarkClient.fromCfg>['sdk'];
   to: string;
   content: string;
+  text?: string;
   msgType: 'post' | 'interactive';
   replyToMessageId?: string;
   replyInThread?: boolean;
+  accountId?: string;
+  cfg?: ClawdbotConfig;
 }): Promise<FeishuSendResult> {
-  const { client, to, content, msgType, replyToMessageId, replyInThread } = params;
+  const { client, to, content, text, msgType, replyToMessageId, replyInThread, accountId, cfg } = params;
 
   // --- Reply path ---
   if (replyToMessageId) {
@@ -105,6 +128,26 @@ async function sendImMessage(params: {
       messageId: response?.data?.message_id ?? '',
       chatId: response?.data?.chat_id ?? '',
     };
+
+    if (msgType === 'post' && cfg && text?.trim()) {
+      const sourceClient = LarkClient.fromCfg(cfg, accountId);
+      await maybeRelayBotMentionsAfterSend({
+        sourceAccountId: accountId ?? sourceClient.accountId,
+        sourceBotOpenId: sourceClient.botOpenId ?? '',
+        chatId: result.chatId || to,
+        sentMessageId: result.messageId,
+        text,
+        messageType: 'text',
+        knownBots: getKnownRelayBots(),
+        alreadySynthetic: isRelayContext(),
+        inject: async ({ targetAccountId, event }) => {
+          const ctx = getRelayContext(targetAccountId);
+          if (!ctx) return;
+          await injectSyntheticRelayEvent({ ctx, event });
+        },
+      });
+    }
+
     log.debug(`reply sent: messageId=${result.messageId}`);
     return result;
   }
@@ -130,6 +173,26 @@ async function sendImMessage(params: {
     messageId: response?.data?.message_id ?? '',
     chatId: response?.data?.chat_id ?? '',
   };
+
+  if (msgType === 'post' && cfg && text?.trim()) {
+    const sourceClient = LarkClient.fromCfg(cfg, accountId);
+    await maybeRelayBotMentionsAfterSend({
+      sourceAccountId: accountId ?? sourceClient.accountId,
+      sourceBotOpenId: sourceClient.botOpenId ?? '',
+      chatId: result.chatId || target,
+      sentMessageId: result.messageId,
+      text,
+      messageType: 'text',
+      knownBots: getKnownRelayBots(),
+      alreadySynthetic: false,
+      inject: async ({ targetAccountId, event }) => {
+        const ctx = getRelayContext(targetAccountId);
+        if (!ctx) return;
+        await injectSyntheticRelayEvent({ ctx, event });
+      },
+    });
+  }
+
   log.debug(`message created: messageId=${result.messageId}`);
   return result;
 }
@@ -251,10 +314,20 @@ export async function sendTextLark(params: SendTextLarkParams): Promise<FeishuSe
 
   log.info(`sendTextLark: target=${to}, textLength=${text.length}`);
   const client = LarkClient.fromCfg(cfg, accountId).sdk;
-  const processedText = prepareTextForLark(cfg, text, accountId);
+  const processedText = prepareTextForLark(cfg, text, accountId, getKnownRelayBots());
   const content = buildPostContent(processedText);
 
-  return sendImMessage({ client, to, content, msgType: 'post', replyToMessageId, replyInThread });
+  return sendImMessage({
+    client,
+    to,
+    content,
+    text,
+    msgType: 'post',
+    replyToMessageId,
+    replyInThread,
+    accountId,
+    cfg,
+  });
 }
 
 // ---------------------------------------------------------------------------

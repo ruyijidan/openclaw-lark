@@ -45,6 +45,13 @@ export interface FeishuMessageEvent {
     }>;
     user_agent?: string;
   };
+  __relay?: {
+    synthetic_source: 'bot-relay';
+    relay_depth: number;
+    source_bot_open_id: string;
+    target_bot_open_id: string;
+    source_message_id: string;
+  };
 }
 
 export interface FeishuReactionCreatedEvent {

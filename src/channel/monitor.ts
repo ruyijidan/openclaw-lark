@@ -9,13 +9,13 @@
  * appropriate handlers.
  */
 
-import type { ClawdbotConfig, RuntimeEnv } from 'openclaw/plugin-sdk';
-import type { HistoryEntry } from 'openclaw/plugin-sdk/reply-history';
+import type { ClawdbotConfig, RuntimeEnv, HistoryEntry } from 'openclaw/plugin-sdk';
 import { getEnabledLarkAccounts, getLarkAccount } from '../core/accounts';
 import { LarkClient } from '../core/lark-client';
 import { MessageDedup } from '../messaging/inbound/dedup';
 import { larkLogger } from '../core/lark-logger';
 import { drainShutdownHooks } from '../core/shutdown-hooks';
+import { registerRelayBot, registerRelayContext } from '../messaging/bot-relay/runtime';
 import type { MonitorContext, MonitorFeishuOpts } from './types';
 import {
   handleBotMembershipEvent,
@@ -72,6 +72,7 @@ async function monitorSingleAccount(params: {
 
   // Create LarkClient instance — manages SDK client, WS, and bot identity.
   const lark = LarkClient.fromAccount(account);
+  await lark.probe();
 
   // Attach dedup instance so it is disposed together with the client.
   lark.messageDedup = messageDedup;
@@ -92,6 +93,15 @@ async function monitorSingleAccount(params: {
     error,
   };
 
+  registerRelayContext(accountId, ctx);
+  if (lark.botOpenId) {
+    registerRelayBot({
+      accountId,
+      botOpenId: lark.botOpenId,
+      botName: lark.botName,
+    });
+  }
+
   await lark.startWS({
     handlers: {
       'im.message.receive_v1': (data) => handleMessageEvent(ctx, data),
@@ -109,6 +119,7 @@ async function monitorSingleAccount(params: {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         handleCardActionEvent(ctx, data)) as any,
     },
+    autoProbe: false,
     abortSignal,
   });
 
