@@ -2,8 +2,10 @@ import type { FeishuMessageEvent } from '../types';
 import type { RelayKnownBot } from './types';
 import { findMentionedRelayTargets } from './registry';
 import { buildSyntheticRelayEvent } from './synthetic-event';
-import { isRelayContext, runInRelayContext } from './relay-async-context';
+import { getRelayDepth, runInRelayContext } from './relay-async-context';
 import { inferMentionsFromText } from './mention-inference';
+
+const MAX_RELAY_DEPTH = 2;
 
 export interface BotRelayServiceConfig {
   resolveBots: () => Array<{ accountId: string; botOpenId: string; botName: string }>;
@@ -22,8 +24,9 @@ export class BotRelayService {
     text: string;
     messageType: string;
   }): Promise<void> {
-    if (isRelayContext()) return;
     if (!params.sourceBotOpenId) return;
+    const currentRelayDepth = getRelayDepth();
+    if (currentRelayDepth >= MAX_RELAY_DEPTH) return;
 
     const bots = this.config.resolveBots();
     if (bots.length === 0) return;
@@ -43,6 +46,7 @@ export class BotRelayService {
         chatId: params.chatId,
         threadId: params.threadId,
         messageId: params.sentMessageId,
+        relayDepth: currentRelayDepth + 1,
         content: JSON.stringify({ text: params.text }),
         messageType: params.messageType,
         mentions: mentions.map((mention) => ({
@@ -52,7 +56,7 @@ export class BotRelayService {
         })),
       });
 
-      await runInRelayContext(() => this.config.inject(target.accountId, event));
+      await runInRelayContext(currentRelayDepth + 1, () => this.config.inject(target.accountId, event));
     }
   }
 }

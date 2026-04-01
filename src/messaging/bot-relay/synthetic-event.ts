@@ -18,7 +18,7 @@ export function buildSyntheticRelayEvent(params: SyntheticRelayBuildParams): Fei
     },
     __relay: {
       synthetic_source: 'bot-relay',
-      relay_depth: 1,
+      relay_depth: params.relayDepth,
       source_bot_open_id: params.sourceBotOpenId,
       target_bot_open_id: params.targetBotOpenId,
       source_message_id: params.messageId,

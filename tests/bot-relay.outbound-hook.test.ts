@@ -24,8 +24,8 @@ describe('maybeRelayBotMentionsAfterSend', () => {
     expect(injected.length).toBe(1);
   });
 
-  it('skips relay when the outbound message originated from synthetic relay', async () => {
-    let injectCalls = 0;
+  it('allows one synthetic-originated reply hop', async () => {
+    const injectedDepths: number[] = [];
 
     await maybeRelayBotMentionsAfterSend({
       sourceAccountId: 'bot-a',
@@ -37,11 +37,11 @@ describe('maybeRelayBotMentionsAfterSend', () => {
       messageType: 'text',
       knownBots: new Map([['ou_bot_b', { accountId: 'bot-b', botOpenId: 'ou_bot_b', botName: 'Bot B' }]]),
       alreadySynthetic: true,
-      inject: async () => {
-        injectCalls += 1;
+      inject: async ({ event }) => {
+        injectedDepths.push(event.__relay?.relay_depth ?? 0);
       },
     });
 
-    expect(injectCalls).toBe(0);
+    expect(injectedDepths).toEqual([2]);
   });
 });

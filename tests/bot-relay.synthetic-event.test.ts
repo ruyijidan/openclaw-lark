@@ -25,6 +25,7 @@ describe('bot relay synthetic event', () => {
       targetBotOpenId: 'ou_bot_b',
       chatId: 'oc_group_1',
       messageId: 'om_source_1',
+      relayDepth: 1,
       content: JSON.stringify({ text: '@Bot B hello' }),
       messageType: 'text',
       mentions: [
@@ -50,6 +51,7 @@ describe('bot relay synthetic event', () => {
       targetBotOpenId: 'ou_bot_b',
       chatId: 'oc_group_1',
       messageId: 'om_source_2',
+      relayDepth: 1,
       content: JSON.stringify({ text: '@Bot B hello again' }),
       messageType: 'text',
       mentions: [],

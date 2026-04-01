@@ -3,8 +3,10 @@ import type { RelayKnownBot } from './types';
 import { registerRelayBot, registerRelayHandler, unregisterRelayHandler, getKnownRelayBots, getRelayHandler } from './runtime';
 import { findMentionedRelayTargets } from './registry';
 import { buildSyntheticRelayEvent } from './synthetic-event';
-import { isRelayContext, runInRelayContext } from './relay-async-context';
+import { getRelayDepth, runInRelayContext } from './relay-async-context';
 import { inferMentionsFromText } from './mention-inference';
+
+const MAX_RELAY_DEPTH = 2;
 
 /**
  * 注册一个 bot 到 relay 系统。返回注销函数，在 bot 停止时调用。
@@ -36,8 +38,9 @@ export async function relayAfterSend(params: {
   text: string;
   messageType?: string;
 }): Promise<void> {
-  if (isRelayContext()) return;
   if (!params.sourceBotOpenId) return;
+  const currentRelayDepth = getRelayDepth();
+  if (currentRelayDepth >= MAX_RELAY_DEPTH) return;
 
   const knownBots = getKnownRelayBots();
   if (knownBots.size === 0) return;
@@ -55,6 +58,7 @@ export async function relayAfterSend(params: {
       targetBotOpenId: target.openId,
       chatId: params.chatId,
       messageId: params.sentMessageId ?? `ts:${Date.now()}`,
+      relayDepth: currentRelayDepth + 1,
       content: JSON.stringify({ text: params.text }),
       messageType: params.messageType ?? 'text',
       mentions: mentions.map((mention) => ({
@@ -64,6 +68,6 @@ export async function relayAfterSend(params: {
       })),
     });
 
-    await runInRelayContext(() => handler(event));
+    await runInRelayContext(currentRelayDepth + 1, () => handler(event));
   }
 }

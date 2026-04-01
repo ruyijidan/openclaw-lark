@@ -1,9 +1,11 @@
 import type { FeishuMessageEvent, MentionInfo } from '../types';
 import { findMentionedRelayTargets } from './registry';
 import { buildSyntheticRelayEvent } from './synthetic-event';
-import { isRelayContext } from './relay-async-context';
+import { getRelayDepth } from './relay-async-context';
 import { inferMentionsFromText } from './mention-inference';
 import type { RelayKnownBot } from './types';
+
+const MAX_RELAY_DEPTH = 2;
 
 export async function maybeRelayBotMentionsAfterSend(params: {
   sourceAccountId: string;
@@ -18,8 +20,9 @@ export async function maybeRelayBotMentionsAfterSend(params: {
   alreadySynthetic: boolean;
   inject: (params: { targetAccountId: string; event: FeishuMessageEvent }) => Promise<void>;
 }): Promise<void> {
-  if (params.alreadySynthetic || isRelayContext()) return;
   if (!params.sourceBotOpenId) return;
+  const currentRelayDepth = Math.max(getRelayDepth(), params.alreadySynthetic ? 1 : 0);
+  if (currentRelayDepth >= MAX_RELAY_DEPTH) return;
 
   const mentions =
     params.mentions && params.mentions.length > 0
@@ -38,6 +41,7 @@ export async function maybeRelayBotMentionsAfterSend(params: {
       chatId: params.chatId,
       threadId: params.threadId,
       messageId: params.sentMessageId,
+      relayDepth: currentRelayDepth + 1,
       content: JSON.stringify({ text: params.text }),
       messageType: params.messageType,
       mentions: mentions.map((mention) => ({

@@ -17,6 +17,7 @@ export interface SyntheticRelayBuildParams {
   targetBotOpenId: string;
   chatId: string;
   messageId: string;
+  relayDepth: number;
   threadId?: string;
   content: string;
   messageType: string;

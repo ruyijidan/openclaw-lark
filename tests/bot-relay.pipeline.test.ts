@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
+import { registerBotForRelay, relayAfterSend } from '../src/messaging/bot-relay/relay-api.ts';
+import { clearRelayRuntimeState } from '../src/messaging/bot-relay/runtime.ts';
 import { mentionedBot } from '../src/messaging/inbound/mention.ts';
 import { buildSyntheticRelayEvent } from '../src/messaging/bot-relay/synthetic-event.ts';
 import type { MessageContext } from '../src/messaging/types.ts';
@@ -30,12 +32,17 @@ function toMessageContext(
 }
 
 describe('bot relay pipeline', () => {
+  afterEach(() => {
+    clearRelayRuntimeState();
+  });
+
   it('synthetic relay event still marks the target bot as mentioned', async () => {
     const event = buildSyntheticRelayEvent({
       sourceBotOpenId: 'ou_bot_a',
       targetBotOpenId: 'ou_bot_b',
       chatId: 'oc_group_1',
       messageId: 'om_sent_3',
+      relayDepth: 1,
       content: JSON.stringify({ text: '@Bot B hello' }),
       messageType: 'text',
       mentions: [{ key: '@_user_1', id: { open_id: 'ou_bot_b' }, name: 'Bot B' }],
@@ -52,6 +59,7 @@ describe('bot relay pipeline', () => {
       targetBotOpenId: 'ou_bot_b',
       chatId: 'oc_group_1',
       messageId: 'om_sent_4',
+      relayDepth: 1,
       content: JSON.stringify({ text: 'hello without mention' }),
       messageType: 'text',
       mentions: [],
@@ -60,5 +68,55 @@ describe('bot relay pipeline', () => {
     const ctx = toMessageContext(event, 'ou_bot_b');
 
     expect(mentionedBot(ctx)).toBe(false);
+  });
+
+  it('allows one relayed reply hop, but stops before an infinite third hop', async () => {
+    const receivedByA: string[] = [];
+    const receivedByB: string[] = [];
+
+    registerBotForRelay({
+      accountId: 'bot-a',
+      botOpenId: 'ou_bot_a',
+      botName: 'Bot A',
+      onRelayEvent: async (event) => {
+        receivedByA.push(event.message.content);
+        await relayAfterSend({
+          accountId: 'bot-a',
+          sourceBotOpenId: 'ou_bot_a',
+          chatId: event.message.chat_id,
+          sentMessageId: 'om_reply_from_a',
+          text: '@Bot B third hop should stop',
+          messageType: 'text',
+        });
+      },
+    });
+    registerBotForRelay({
+      accountId: 'bot-b',
+      botOpenId: 'ou_bot_b',
+      botName: 'Bot B',
+      onRelayEvent: async (event) => {
+        receivedByB.push(event.message.content);
+        await relayAfterSend({
+          accountId: 'bot-b',
+          sourceBotOpenId: 'ou_bot_b',
+          chatId: event.message.chat_id,
+          sentMessageId: 'om_reply_from_b',
+          text: '@Bot A second hop works',
+          messageType: 'text',
+        });
+      },
+    });
+
+    await relayAfterSend({
+      accountId: 'bot-a',
+      sourceBotOpenId: 'ou_bot_a',
+      chatId: 'oc_group_1',
+      sentMessageId: 'om_initial',
+      text: '@Bot B first hop works',
+      messageType: 'text',
+    });
+
+    expect(receivedByB).toEqual([JSON.stringify({ text: '@Bot B first hop works' })]);
+    expect(receivedByA).toEqual([JSON.stringify({ text: '@Bot A second hop works' })]);
   });
 });
