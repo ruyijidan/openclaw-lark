@@ -5,7 +5,7 @@ import { buildSyntheticRelayEvent } from './synthetic-event';
 import { getRelayDepth, runInRelayContext } from './relay-async-context';
 import { inferMentionsFromText } from './mention-inference';
 
-const MAX_RELAY_DEPTH = 2;
+const MAX_RELAY_DEPTH = 20;
 
 export interface BotRelayServiceConfig {
   resolveBots: () => Array<{ accountId: string; botOpenId: string; botName: string }>;

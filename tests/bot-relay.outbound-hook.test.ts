@@ -44,4 +44,28 @@ describe('maybeRelayBotMentionsAfterSend', () => {
 
     expect(injectedDepths).toEqual([2]);
   });
+
+  it('still relays when current depth is 19', async () => {
+    const relayAsyncContext = await import('../src/messaging/bot-relay/relay-async-context.ts');
+    const injectedDepths: number[] = [];
+
+    await relayAsyncContext.runInRelayContext(19, async () => {
+      await maybeRelayBotMentionsAfterSend({
+        sourceAccountId: 'bot-a',
+        sourceBotOpenId: 'ou_bot_a',
+        chatId: 'oc_group_1',
+        sentMessageId: 'om_sent_3',
+        text: '@Bot B hello again',
+        mentions: [{ key: '@_user_1', openId: 'ou_bot_b', name: 'Bot B', isBot: true }],
+        messageType: 'text',
+        knownBots: new Map([['ou_bot_b', { accountId: 'bot-b', botOpenId: 'ou_bot_b', botName: 'Bot B' }]]),
+        alreadySynthetic: false,
+        inject: async ({ event }) => {
+          injectedDepths.push(event.__relay?.relay_depth ?? 0);
+        },
+      });
+    });
+
+    expect(injectedDepths).toEqual([20]);
+  });
 });

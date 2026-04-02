@@ -5,7 +5,7 @@ import { getRelayDepth } from './relay-async-context';
 import { inferMentionsFromText } from './mention-inference';
 import type { RelayKnownBot } from './types';
 
-const MAX_RELAY_DEPTH = 2;
+const MAX_RELAY_DEPTH = 20;
 
 export async function maybeRelayBotMentionsAfterSend(params: {
   sourceAccountId: string;

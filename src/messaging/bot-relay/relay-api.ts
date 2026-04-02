@@ -6,7 +6,7 @@ import { buildSyntheticRelayEvent } from './synthetic-event';
 import { getRelayDepth, runInRelayContext } from './relay-async-context';
 import { inferMentionsFromText } from './mention-inference';
 
-const MAX_RELAY_DEPTH = 2;
+const MAX_RELAY_DEPTH = 20;
 
 /**
  * 注册一个 bot 到 relay 系统。返回注销函数，在 bot 停止时调用。

@@ -70,7 +70,7 @@ describe('bot relay pipeline', () => {
     expect(mentionedBot(ctx)).toBe(false);
   });
 
-  it('allows one relayed reply hop, but stops before an infinite third hop', async () => {
+  it('allows relayed replies to continue until the temporary depth cap of 20', async () => {
     const receivedByA: string[] = [];
     const receivedByB: string[] = [];
 
@@ -85,7 +85,7 @@ describe('bot relay pipeline', () => {
           sourceBotOpenId: 'ou_bot_a',
           chatId: event.message.chat_id,
           sentMessageId: 'om_reply_from_a',
-          text: '@Bot B third hop should stop',
+          text: '@Bot B third hop continues',
           messageType: 'text',
         });
       },
@@ -116,7 +116,12 @@ describe('bot relay pipeline', () => {
       messageType: 'text',
     });
 
-    expect(receivedByB).toEqual([JSON.stringify({ text: '@Bot B first hop works' })]);
-    expect(receivedByA).toEqual([JSON.stringify({ text: '@Bot A second hop works' })]);
+    expect(receivedByB).toEqual([
+      JSON.stringify({ text: '@Bot B first hop works' }),
+      ...Array.from({ length: 9 }, () => JSON.stringify({ text: '@Bot B third hop continues' })),
+    ]);
+    expect(receivedByA).toEqual(
+      Array.from({ length: 10 }, () => JSON.stringify({ text: '@Bot A second hop works' })),
+    );
   });
 });
