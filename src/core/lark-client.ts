@@ -117,6 +117,61 @@ function credentialsEqual(a: unknown, b: unknown): boolean {
   return false;
 }
 
+interface WsHeaderLike {
+  key?: unknown;
+  value?: unknown;
+}
+
+interface WsEnvelopeSummary {
+  transportType: string | undefined;
+  eventType: string | undefined;
+  eventId: string | undefined;
+  chatId: string | undefined;
+  messageId: string | undefined;
+  messageType: string | undefined;
+  senderOpenId: string | undefined;
+  senderType: string | undefined;
+  mentionCount: number;
+  isFromBot: boolean;
+}
+
+function getWsHeaderValue(headers: unknown, key: string): string | undefined {
+  if (!Array.isArray(headers)) return undefined;
+  const header = headers.find((item) => {
+    if (!item || typeof item !== 'object') return false;
+    return (item as WsHeaderLike).key === key;
+  }) as WsHeaderLike | undefined;
+  return typeof header?.value === 'string' ? header.value : undefined;
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+export function summarizeWsInboundEnvelope(data: unknown): WsEnvelopeSummary {
+  const envelope = data && typeof data === 'object' ? data as Record<string, any> : {};
+  const event = envelope.event && typeof envelope.event === 'object' ? envelope.event as Record<string, any> : {};
+  const header = event.header && typeof event.header === 'object' ? event.header as Record<string, any> : {};
+  const message = event.message && typeof event.message === 'object' ? event.message as Record<string, any> : {};
+  const sender = event.sender && typeof event.sender === 'object' ? event.sender as Record<string, any> : {};
+  const senderId = sender.sender_id && typeof sender.sender_id === 'object' ? sender.sender_id as Record<string, any> : {};
+  const mentions = Array.isArray(message.mentions) ? message.mentions : [];
+  const senderType = readString(sender.sender_type);
+
+  return {
+    transportType: getWsHeaderValue(envelope.headers, 'type'),
+    eventType: readString(header.event_type),
+    eventId: readString(event.event_id),
+    chatId: readString(message.chat_id),
+    messageId: readString(message.message_id),
+    messageType: readString(message.message_type),
+    senderOpenId: readString(senderId.open_id),
+    senderType,
+    mentionCount: mentions.length,
+    isFromBot: senderType === 'app',
+  };
+}
+
 export class LarkClient {
   readonly account: LarkAccount;
 
@@ -381,6 +436,10 @@ export class LarkClient {
     const wsClientAny = this._wsClient as any;
     const origHandleEventData = wsClientAny.handleEventData.bind(wsClientAny);
     wsClientAny.handleEventData = (data: any) => {
+      log.info(`received raw websocket envelope`, {
+        accountId: this.accountId,
+        ...summarizeWsInboundEnvelope(data),
+      });
       const msgType = data.headers?.find?.((h: any) => h.key === 'type')?.value;
       if (msgType === 'card') {
         const patchedData = {
