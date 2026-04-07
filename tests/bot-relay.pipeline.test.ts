@@ -38,7 +38,9 @@ describe('bot relay pipeline', () => {
 
   it('synthetic relay event still marks the target bot as mentioned', async () => {
     const event = buildSyntheticRelayEvent({
+      sourceBotAppId: 'cli_bot_a',
       sourceBotOpenId: 'ou_bot_a',
+      targetBotAppId: 'cli_bot_b',
       targetBotOpenId: 'ou_bot_b',
       chatId: 'oc_group_1',
       messageId: 'om_sent_3',
@@ -55,7 +57,9 @@ describe('bot relay pipeline', () => {
 
   it('synthetic relay event without target mention does not bypass mention logic', () => {
     const event = buildSyntheticRelayEvent({
+      sourceBotAppId: 'cli_bot_a',
       sourceBotOpenId: 'ou_bot_a',
+      targetBotAppId: 'cli_bot_b',
       targetBotOpenId: 'ou_bot_b',
       chatId: 'oc_group_1',
       messageId: 'om_sent_4',
@@ -77,6 +81,7 @@ describe('bot relay pipeline', () => {
     registerBotForRelay({
       accountId: 'bot-a',
       appId: 'cli_bot_a',
+      botOpenId: 'ou_bot_a',
       botName: 'Bot A',
       onRelayEvent: async (event) => {
         receivedByA.push(event.message.content);
@@ -93,6 +98,7 @@ describe('bot relay pipeline', () => {
     registerBotForRelay({
       accountId: 'bot-b',
       appId: 'cli_bot_b',
+      botOpenId: 'ou_bot_b',
       botName: 'Bot B',
       onRelayEvent: async (event) => {
         receivedByB.push(event.message.content);

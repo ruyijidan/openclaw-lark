@@ -14,8 +14,10 @@ export interface RelayTargetMatch {
 }
 
 export interface SyntheticRelayBuildParams {
-  sourceBotOpenId: string;
-  targetBotOpenId: string;
+  sourceBotAppId: string;
+  targetBotAppId: string;
+  sourceBotOpenId?: string;
+  targetBotOpenId?: string;
   chatId: string;
   messageId: string;
   relayDepth: number;

@@ -19,10 +19,10 @@ describe('bot relay synthetic event', () => {
     expect(targets.map((item) => item.openId)).toEqual(['ou_bot_b']);
   });
 
-  it('buildSyntheticRelayEvent creates a group message event accepted by the inbound parser', () => {
+  it('buildSyntheticRelayEvent creates a Feishu-like group message event accepted by the inbound parser', () => {
     const event = buildSyntheticRelayEvent({
-      sourceBotOpenId: 'ou_bot_a',
-      targetBotOpenId: 'ou_bot_b',
+      sourceBotAppId: 'cli_bot_a',
+      targetBotAppId: 'cli_bot_b',
       chatId: 'oc_group_1',
       messageId: 'om_source_1',
       relayDepth: 1,
@@ -37,18 +37,23 @@ describe('bot relay synthetic event', () => {
       ],
     });
 
-    expect(event.sender.sender_type).toBe('app');
+    expect(event.schema).toBe('2.0');
+    expect(event.event_type).toBe('im.message.receive_v1');
+    expect(event.app_id).toBe('cli_bot_b');
+    expect(event.sender.sender_type).toBe('user');
     expect(event.message.chat_type).toBe('group');
     expect(event.message.message_type).toBe('text');
     expect(event.message.chat_id).toBe('oc_group_1');
     expect(event.message.mentions?.[0]?.id?.open_id).toBe('ou_bot_b');
+    expect(event.message.mentions?.[0]?.mentioned_type).toBe('bot');
+    expect(event.message.mentions?.[0]?.bot_info?.app_id).toBe('cli_bot_b');
     expect(event.message.message_id).toMatch(/^synthetic:bot-relay:/);
   });
 
   it('buildSyntheticRelayEvent marks the event as synthetic relay metadata', () => {
     const event = buildSyntheticRelayEvent({
-      sourceBotOpenId: 'ou_bot_a',
-      targetBotOpenId: 'ou_bot_b',
+      sourceBotAppId: 'cli_bot_a',
+      targetBotAppId: 'cli_bot_b',
       chatId: 'oc_group_1',
       messageId: 'om_source_2',
       relayDepth: 1,
@@ -59,6 +64,6 @@ describe('bot relay synthetic event', () => {
 
     expect(event.__relay?.synthetic_source).toBe('bot-relay');
     expect(event.__relay?.relay_depth).toBe(1);
-    expect(event.__relay?.source_bot_open_id).toBe('ou_bot_a');
+    expect(event.__relay?.source_bot_app_id).toBe('cli_bot_a');
   });
 });

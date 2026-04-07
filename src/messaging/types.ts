@@ -13,6 +13,13 @@
 // ---------------------------------------------------------------------------
 
 export interface FeishuMessageEvent {
+  schema?: string;
+  event_id?: string;
+  token?: string;
+  create_time?: string;
+  event_type?: string;
+  tenant_key?: string;
+  app_id?: string;
   sender: {
     sender_id: {
       open_id?: string;
@@ -35,6 +42,10 @@ export interface FeishuMessageEvent {
     content: string;
     mentions?: Array<{
       key: string;
+      mentioned_type?: string;
+      bot_info?: {
+        app_id?: string;
+      };
       id: {
         open_id?: string;
         user_id?: string;
@@ -48,8 +59,10 @@ export interface FeishuMessageEvent {
   __relay?: {
     synthetic_source: 'bot-relay';
     relay_depth: number;
-    source_bot_open_id: string;
-    target_bot_open_id: string;
+    source_bot_app_id: string;
+    target_bot_app_id: string;
+    source_bot_open_id?: string;
+    target_bot_open_id?: string;
     source_message_id: string;
   };
 }
@@ -140,6 +153,10 @@ export interface RawMessage {
   content: string;
   mentions?: Array<{
     key: string;
+    mentioned_type?: string;
+    bot_info?: {
+      app_id?: string;
+    };
     id: { open_id?: string; user_id?: string; union_id?: string };
     name: string;
     tenant_key?: string;

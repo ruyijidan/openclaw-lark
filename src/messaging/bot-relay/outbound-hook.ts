@@ -9,7 +9,8 @@ const MAX_RELAY_DEPTH = 20;
 
 export async function maybeRelayBotMentionsAfterSend(params: {
   sourceAccountId: string;
-  sourceBotOpenId: string;
+  sourceBotAppId: string;
+  sourceBotOpenId?: string;
   chatId: string;
   sentMessageId: string;
   threadId?: string;
@@ -20,7 +21,7 @@ export async function maybeRelayBotMentionsAfterSend(params: {
   alreadySynthetic: boolean;
   inject: (params: { targetAccountId: string; event: FeishuMessageEvent }) => Promise<void>;
 }): Promise<void> {
-  if (!params.sourceBotOpenId) return;
+  if (!params.sourceBotAppId) return;
   const currentRelayDepth = Math.max(getRelayDepth(), params.alreadySynthetic ? 1 : 0);
   if (currentRelayDepth >= MAX_RELAY_DEPTH) return;
 
@@ -32,12 +33,15 @@ export async function maybeRelayBotMentionsAfterSend(params: {
   const relayTargets = findMentionedRelayTargets({
     mentions,
     knownBots: params.knownBots,
-  }).filter((target) => target.openId !== params.sourceBotOpenId);
+  }).filter((target) => target.openId !== params.sourceBotAppId);
 
   for (const target of relayTargets) {
+    const targetBot = params.knownBots.get(target.openId);
     const event = buildSyntheticRelayEvent({
+      sourceBotAppId: params.sourceBotAppId,
+      targetBotAppId: targetBot?.appId ?? target.openId,
       sourceBotOpenId: params.sourceBotOpenId,
-      targetBotOpenId: target.openId,
+      targetBotOpenId: targetBot?.botOpenId,
       chatId: params.chatId,
       threadId: params.threadId,
       messageId: params.sentMessageId,
@@ -46,7 +50,9 @@ export async function maybeRelayBotMentionsAfterSend(params: {
       messageType: params.messageType,
       mentions: mentions.map((mention) => ({
         key: mention.key,
-        id: { open_id: mention.openId },
+        mentioned_type: 'bot',
+        bot_info: { app_id: params.knownBots.get(mention.openId)?.appId ?? mention.openId },
+        id: { open_id: params.knownBots.get(mention.openId)?.botOpenId ?? mention.openId },
         name: mention.name,
       })),
     });

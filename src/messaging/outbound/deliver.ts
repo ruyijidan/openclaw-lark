@@ -133,6 +133,7 @@ async function sendImMessage(params: {
       const sourceClient = LarkClient.fromCfg(cfg, accountId);
       await maybeRelayBotMentionsAfterSend({
         sourceAccountId: accountId ?? sourceClient.accountId,
+        sourceBotAppId: sourceClient.account.appId ?? '',
         sourceBotOpenId: sourceClient.botOpenId ?? '',
         chatId: result.chatId || to,
         sentMessageId: result.messageId,
@@ -178,6 +179,7 @@ async function sendImMessage(params: {
     const sourceClient = LarkClient.fromCfg(cfg, accountId);
     await maybeRelayBotMentionsAfterSend({
       sourceAccountId: accountId ?? sourceClient.accountId,
+      sourceBotAppId: sourceClient.account.appId ?? '',
       sourceBotOpenId: sourceClient.botOpenId ?? '',
       chatId: result.chatId || target,
       sentMessageId: result.messageId,

@@ -17,10 +17,11 @@ const MAX_RELAY_DEPTH = 20;
 export function registerBotForRelay(params: {
   accountId: string;
   appId: string;
+  botOpenId?: string;
   botName: string;
   onRelayEvent: (event: FeishuMessageEvent) => Promise<void>;
 }): () => void {
-  registerRelayBot({ accountId: params.accountId, appId: params.appId, botName: params.botName });
+  registerRelayBot({ accountId: params.accountId, appId: params.appId, botOpenId: params.botOpenId, botName: params.botName });
   registerRelayHandler(params.accountId, params.onRelayEvent);
   return () => unregisterRelayHandler(params.accountId);
 }
@@ -44,6 +45,7 @@ export async function relayAfterSend(params: {
 
   const knownBots = getKnownRelayBots();
   if (knownBots.size === 0) return;
+  const sourceBot = knownBots.get(params.sourceAppId);
 
   const mentions = inferMentionsFromText(params.text, knownBots);
   const relayTargets = findMentionedRelayTargets({ mentions, knownBots })
@@ -52,10 +54,14 @@ export async function relayAfterSend(params: {
   for (const target of relayTargets) {
     const handler = getRelayHandler(target.accountId);
     if (!handler) continue;
+    const targetBot = knownBots.get(target.openId);
+    const targetAppId = targetBot?.appId ?? target.openId;
 
     const event = buildSyntheticRelayEvent({
-      sourceBotOpenId: params.sourceAppId,
-      targetBotOpenId: target.openId,
+      sourceBotAppId: params.sourceAppId,
+      targetBotAppId: targetAppId,
+      sourceBotOpenId: sourceBot?.botOpenId,
+      targetBotOpenId: targetBot?.botOpenId,
       chatId: params.chatId,
       messageId: params.sentMessageId ?? `ts:${Date.now()}`,
       relayDepth: currentRelayDepth + 1,
@@ -63,7 +69,9 @@ export async function relayAfterSend(params: {
       messageType: params.messageType ?? 'text',
       mentions: mentions.map((mention) => ({
         key: mention.key,
-        id: { open_id: mention.openId },
+        mentioned_type: 'bot',
+        bot_info: { app_id: knownBots.get(mention.openId)?.appId ?? mention.openId },
+        id: { open_id: knownBots.get(mention.openId)?.botOpenId ?? mention.openId },
         name: mention.name,
       })),
     });
