@@ -2,13 +2,14 @@ import type { MonitorContext } from '../../channel/types';
 import type { FeishuMessageEvent } from '../types';
 import type { RelayKnownBot } from './types';
 
-const knownBotsByOpenId = new Map<string, RelayKnownBot>();
+const knownBotsByAppId = new Map<string, RelayKnownBot>();
 const contextsByAccountId = new Map<string, MonitorContext>();
 const relayHandlersByAccountId = new Map<string, (event: FeishuMessageEvent) => Promise<void>>();
 
 export function registerRelayBot(params: RelayKnownBot): void {
-  if (!params.botOpenId) return;
-  knownBotsByOpenId.set(params.botOpenId, params);
+  const routeId = params.appId ?? params.botOpenId;
+  if (!routeId) return;
+  knownBotsByAppId.set(routeId, params);
 }
 
 export function registerRelayContext(accountId: string, ctx: MonitorContext): void {
@@ -16,7 +17,7 @@ export function registerRelayContext(accountId: string, ctx: MonitorContext): vo
 }
 
 export function getKnownRelayBots(): Map<string, RelayKnownBot> {
-  return new Map(knownBotsByOpenId);
+  return new Map(knownBotsByAppId);
 }
 
 export function getRelayContext(accountId: string): MonitorContext | undefined {
@@ -36,7 +37,7 @@ export function getRelayHandler(accountId: string): ((event: FeishuMessageEvent)
 }
 
 export function clearRelayRuntimeState(): void {
-  knownBotsByOpenId.clear();
+  knownBotsByAppId.clear();
   contextsByAccountId.clear();
   relayHandlersByAccountId.clear();
 }

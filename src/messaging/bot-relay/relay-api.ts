@@ -16,11 +16,11 @@ const MAX_RELAY_DEPTH = 20;
  */
 export function registerBotForRelay(params: {
   accountId: string;
-  botOpenId: string;
+  appId: string;
   botName: string;
   onRelayEvent: (event: FeishuMessageEvent) => Promise<void>;
 }): () => void {
-  registerRelayBot({ accountId: params.accountId, botOpenId: params.botOpenId, botName: params.botName });
+  registerRelayBot({ accountId: params.accountId, appId: params.appId, botName: params.botName });
   registerRelayHandler(params.accountId, params.onRelayEvent);
   return () => unregisterRelayHandler(params.accountId);
 }
@@ -32,13 +32,13 @@ export function registerBotForRelay(params: {
  */
 export async function relayAfterSend(params: {
   accountId: string;
-  sourceBotOpenId: string;
+  sourceAppId: string;
   chatId: string;
   sentMessageId?: string;
   text: string;
   messageType?: string;
 }): Promise<void> {
-  if (!params.sourceBotOpenId) return;
+  if (!params.sourceAppId) return;
   const currentRelayDepth = getRelayDepth();
   if (currentRelayDepth >= MAX_RELAY_DEPTH) return;
 
@@ -47,14 +47,14 @@ export async function relayAfterSend(params: {
 
   const mentions = inferMentionsFromText(params.text, knownBots);
   const relayTargets = findMentionedRelayTargets({ mentions, knownBots })
-    .filter((target) => target.openId !== params.sourceBotOpenId);
+    .filter((target) => target.openId !== params.sourceAppId);
 
   for (const target of relayTargets) {
     const handler = getRelayHandler(target.accountId);
     if (!handler) continue;
 
     const event = buildSyntheticRelayEvent({
-      sourceBotOpenId: params.sourceBotOpenId,
+      sourceBotOpenId: params.sourceAppId,
       targetBotOpenId: target.openId,
       chatId: params.chatId,
       messageId: params.sentMessageId ?? `ts:${Date.now()}`,

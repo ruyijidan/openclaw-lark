@@ -2,6 +2,7 @@ import type { FeishuMessageEvent, MentionInfo } from '../types';
 
 export interface RelayKnownBot {
   accountId: string;
+  appId?: string;
   botOpenId?: string;
   botName?: string;
 }

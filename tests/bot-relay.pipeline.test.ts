@@ -76,13 +76,13 @@ describe('bot relay pipeline', () => {
 
     registerBotForRelay({
       accountId: 'bot-a',
-      botOpenId: 'ou_bot_a',
+      appId: 'cli_bot_a',
       botName: 'Bot A',
       onRelayEvent: async (event) => {
         receivedByA.push(event.message.content);
         await relayAfterSend({
           accountId: 'bot-a',
-          sourceBotOpenId: 'ou_bot_a',
+          sourceAppId: 'cli_bot_a',
           chatId: event.message.chat_id,
           sentMessageId: 'om_reply_from_a',
           text: '@Bot B third hop continues',
@@ -92,13 +92,13 @@ describe('bot relay pipeline', () => {
     });
     registerBotForRelay({
       accountId: 'bot-b',
-      botOpenId: 'ou_bot_b',
+      appId: 'cli_bot_b',
       botName: 'Bot B',
       onRelayEvent: async (event) => {
         receivedByB.push(event.message.content);
         await relayAfterSend({
           accountId: 'bot-b',
-          sourceBotOpenId: 'ou_bot_b',
+          sourceAppId: 'cli_bot_b',
           chatId: event.message.chat_id,
           sentMessageId: 'om_reply_from_b',
           text: '@Bot A second hop works',
@@ -109,7 +109,7 @@ describe('bot relay pipeline', () => {
 
     await relayAfterSend({
       accountId: 'bot-a',
-      sourceBotOpenId: 'ou_bot_a',
+      sourceAppId: 'cli_bot_a',
       chatId: 'oc_group_1',
       sentMessageId: 'om_initial',
       text: '@Bot B first hop works',
